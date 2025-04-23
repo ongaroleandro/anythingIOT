@@ -1,0 +1,14 @@
+{
+    "C_Cpp.intelliSenseEngine": "default",
+    "idf.espIdfPathWin": "C:\\Users\\ongar\\esp\\v5.4\\esp-idf",
+    "idf.pythonInstallPath": "C:\\Users\\ongar\\.espressif\\tools\\idf-python\\3.11.2\\python.exe",
+    "idf.openOcdConfigs": [
+        "board/esp32c3-builtin.cfg"
+    ],
+    "idf.toolsPathWin": "C:\\Users\\ongar\\.espressif",
+    "idf.customExtraVars": {
+        "IDF_TARGET": "esp32c3"
+    },
+    "idf.flashType": "UART",
+    "idf.portWin": "COM3"
+}
