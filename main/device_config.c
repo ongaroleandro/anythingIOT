@@ -27,6 +27,7 @@ void device_config_generate_id(void) {
     const char charset[] = "abcdefghijklmnopqrstuvwxyz0123456789";
     
     // Seed the random number generator
+    /* TODO: make it actually generate a random number*/
     srand(1222334);
     
     // Generate random ID
