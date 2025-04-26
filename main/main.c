@@ -12,6 +12,8 @@
 #define LED_GPIO 6
 #define LED_NUM 30
 
+#include "device_config.h"
+
 CRGB* ws2812_buffer;
 
 static const char TAG_wifi[] = "Wi-Fi";
@@ -24,6 +26,12 @@ void cb_connection_ok(void *pvParameter){
 
 	ESP_LOGI(TAG_wifi, "I have a connection and my IP is %s!", str_ip);
 
+    // Initialize device configuration first
+    if (!device_config_init()) {
+        ESP_LOGE(TAG_wifi, "Failed to initialize device configuration!");
+        return;
+    }
+    /* TODO: looks like app starts too soon. Even though we got a connection event, the config message got missed by the mqtt server*/
 	mqtt_app_start();
 }
 

@@ -4,14 +4,16 @@
 #include "mqtt_client.h"
 #include <cJSON.h>
 #include "mqtt.h"
+#include "device_config.h"
 
 
 static const char *TAG_mqtt = "mqtt";
 
-// MQTT topics
-static char *config_topic = "homeassistant/light/6xalj9_light/config";
-static char *command_topic = "homeassistant/light/6xalj9_light/set";
-static char *state_topic = "homeassistant/light/6xalj9_light/state";
+// MQTT topics - will be set dynamically based on device ID
+static char config_topic[64];
+static char command_topic[64];
+static char state_topic[64];
+static char unique_id[64];
 
 // Global light state
 static light_state_t stLightState = {
@@ -27,6 +29,7 @@ static light_state_t stLightState = {
 static void publish_config(esp_mqtt_client_handle_t client);
 static bool parse_mqtt_message(const char *payload, light_state_t *state);
 static char *create_config(void);
+static void setup_topics(void);
 
 static void log_error_if_nonzero(const char *message, int error_code)
 {
@@ -56,6 +59,8 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         ESP_LOGI(TAG_mqtt, "MQTT_EVENT_CONNECTED");
         esp_mqtt_client_subscribe(client, command_topic, 0);
         publish_config(client);
+
+        /* TODO: implement publishing initial state*/
         break;
     case MQTT_EVENT_DISCONNECTED:
         ESP_LOGI(TAG_mqtt, "MQTT_EVENT_DISCONNECTED");
@@ -70,8 +75,12 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         ESP_LOGI(TAG_mqtt, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
         break;
     case MQTT_EVENT_DATA:
-        parse_mqtt_message(event->data,&stLightState);
-        esp_mqtt_client_publish(client, state_topic, event->data, event->data_len, 0, true);
+        if (parse_mqtt_message(event->data, &stLightState)) {
+            // Store the new state in NVS
+            device_config_store_light_state(&stLightState);
+
+            esp_mqtt_client_publish(client, state_topic, event->data, event->data_len, 0, true);
+        }
         break;
     case MQTT_EVENT_ERROR:
         ESP_LOGI(TAG_mqtt, "MQTT_EVENT_ERROR");
@@ -87,6 +96,21 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         ESP_LOGI(TAG_mqtt, "Other event id:%d", event->event_id);
         break;
     }
+}
+
+// Set up topic strings based on device ID
+static void setup_topics(void) {
+    char *device_id = device_config_get_id();
+    
+    snprintf(config_topic, sizeof(config_topic), "homeassistant/light/%s_light/config", device_id);
+    snprintf(command_topic, sizeof(command_topic), "homeassistant/light/%s_light/set", device_id);
+    snprintf(state_topic, sizeof(state_topic), "homeassistant/light/%s_light/state", device_id);
+    snprintf(unique_id, sizeof(unique_id), "%s_light", device_id);
+    
+    ESP_LOGI(TAG_mqtt, "Topics configured with device ID %s", device_id);
+    ESP_LOGI(TAG_mqtt, "Config topic: %s", config_topic);
+    ESP_LOGI(TAG_mqtt, "Command topic: %s", command_topic);
+    ESP_LOGI(TAG_mqtt, "State topic: %s", state_topic);
 }
 
 char *create_config(void)
@@ -105,15 +129,16 @@ char *create_config(void)
 		goto end;
 	}
 	
-	cJSON_AddStringToObject(config, "command_topic", "homeassistant/light/6xalj9_light/set");
-	cJSON_AddStringToObject(config, "state_topic", "homeassistant/light/6xalj9_light/state");
-	cJSON_AddStringToObject(config, "unique_id", "6xalj9_light");
+	cJSON_AddStringToObject(config, "command_topic", command_topic);
+	cJSON_AddStringToObject(config, "state_topic", state_topic);
+	cJSON_AddStringToObject(config, "unique_id", unique_id);
 	cJSON_AddStringToObject(config, "platform", "mqtt");
 	
 	//create device JSON
 	cJSON *device = cJSON_CreateObject();
 	identifier = cJSON_AddArrayToObject(device, "ids");
-	identifier_string = cJSON_CreateString("6xalj9"); //could also use CJSON_PUBLIC(cJSON *) cJSON_CreateStringArray(const char *const *strings, int count); if more than 1 color
+    char *id_string = device_config_get_id();
+	identifier_string = cJSON_CreateString(id_string); //could also use CJSON_PUBLIC(cJSON *) cJSON_CreateStringArray(const char *const *strings, int count); if more than 1 color
 	cJSON_AddItemToArray(identifier, identifier_string);
 	cJSON_AddStringToObject(device, "name", "OngaroLight");
 	cJSON_AddStringToObject(device, "mf", "Ongaro");
@@ -189,6 +214,9 @@ light_state_t* mqtt_get_light_state(void) {
 
 void mqtt_app_start(void)
 {
+    // Set up topics using the device ID
+    setup_topics();
+    
     esp_mqtt_client_config_t mqtt_cfg = {
         .broker.address.uri = CONFIG_BROKER_URL,
         .credentials.username = CONFIG_MQTT_USERNAME,
