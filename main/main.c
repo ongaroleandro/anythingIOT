@@ -31,13 +31,9 @@ void cb_connection_ok(void *pvParameter){
         ESP_LOGE(TAG_wifi, "Failed to initialize device configuration!");
         return;
     }
-    /* TODO: looks like app starts too soon. Even though we got a connection event, the config message got missed by the mqtt server*/
+    
 	mqtt_app_start();
 }
-
-// MQTT topics (based on the Python code)
-//static const char *discovery_prefix = "homeassistant";
-//static char device_id[7];
 
 static const char TAG_led[] = "LED";
 static void configure_led(void)

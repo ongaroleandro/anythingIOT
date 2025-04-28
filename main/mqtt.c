@@ -202,7 +202,7 @@ bool parse_mqtt_message(const char *payload, light_state_t *state) {
 // Function to publish configuration topics
 static void publish_config(esp_mqtt_client_handle_t client) {
     char *my_config = create_config();
-    esp_mqtt_client_publish(client, config_topic, my_config, 0, 0, true);
+    esp_mqtt_client_publish(client, config_topic, my_config, 0, 1, true);
     ESP_LOGI(TAG_mqtt, "Published configuration topics");
     free(my_config);
 }
