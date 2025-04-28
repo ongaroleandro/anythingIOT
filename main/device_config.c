@@ -15,11 +15,11 @@ static const char *TAG = "device_config";
 static char device_id[DEVICE_ID_LENGTH + 1]; // +1 for null terminator
 static light_state_t current_light_state = {
     .is_on = false,
-    .r = 255,  // Default to full white when turned on
-    .g = 255,
-    .b = 255,
-    .w = 255,
-    .brightness = 4095
+    .r = 0,
+    .g = 0,
+    .b = 0,
+    .w = 0,
+    .brightness = 0
 };
 
 // Generate a random alphanumeric string for device ID

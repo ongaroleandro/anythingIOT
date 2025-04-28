@@ -27,6 +27,7 @@ static light_state_t stLightState = {
 
 // Forward declarations
 static void publish_config(esp_mqtt_client_handle_t client);
+static void publish_init_state(esp_mqtt_client_handle_t client);
 static bool parse_mqtt_message(const char *payload, light_state_t *state);
 static char *create_config(void);
 static void setup_topics(void);
@@ -60,7 +61,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         esp_mqtt_client_subscribe(client, command_topic, 0);
         publish_config(client);
 
-        /* TODO: implement publishing initial state*/
+        publish_init_state(client);
         break;
     case MQTT_EVENT_DISCONNECTED:
         ESP_LOGI(TAG_mqtt, "MQTT_EVENT_DISCONNECTED");
@@ -96,6 +97,46 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         ESP_LOGI(TAG_mqtt, "Other event id:%d", event->event_id);
         break;
     }
+}
+
+// Create and publish initial state JSON
+static void publish_init_state(esp_mqtt_client_handle_t client) {
+    light_state_t* last_known_state = device_config_get_light_state();
+    stLightState.is_on = last_known_state->is_on;
+    stLightState.g = last_known_state->g;
+    stLightState.b = last_known_state->b;
+    stLightState.w = last_known_state->w;
+    stLightState.brightness = last_known_state->brightness;
+    stLightState.r = last_known_state->r;
+
+    cJSON *root = cJSON_CreateObject();
+    
+    // Add state (ON/OFF)
+    cJSON_AddStringToObject(root, "state", stLightState.is_on ? "ON" : "OFF");
+    
+    // Add brightness
+    cJSON_AddNumberToObject(root, "brightness", stLightState.brightness);
+    
+    // Add color
+    cJSON *color = cJSON_CreateObject();
+    cJSON_AddNumberToObject(color, "r", stLightState.r);
+    cJSON_AddNumberToObject(color, "g", stLightState.g);
+    cJSON_AddNumberToObject(color, "b", stLightState.b);
+    cJSON_AddNumberToObject(color, "w", stLightState.w);
+
+    // Add color JSON to state json
+    cJSON_AddItemToObject(root, "color", color);
+    
+    // Convert to string
+    char *payload = cJSON_Print(root);
+    
+    // Publish
+    esp_mqtt_client_publish(client, state_topic, payload, 0, 0, true);
+    ESP_LOGI(TAG_mqtt, "Published state: %s", payload);
+    
+    // Cleanup
+    free(payload);
+    cJSON_Delete(root);
 }
 
 // Set up topic strings based on device ID
