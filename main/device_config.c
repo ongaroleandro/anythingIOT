@@ -5,6 +5,8 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+#include "esp_mac.h"
+#include "esp_random.h"
 
 #define DEVICE_ID_KEY "device_id"
 #define LIGHT_STATE_KEY "light_state"
@@ -24,20 +26,41 @@ static light_state_t current_light_state = {
 
 // Generate a random alphanumeric string for device ID
 void device_config_generate_id(void) {
-    const char charset[] = "abcdefghijklmnopqrstuvwxyz0123456789";
-    
-    // Seed the random number generator
-    /* TODO: make it actually generate a random number*/
-    srand(1222334);
-    
-    // Generate random ID
-    for (int i = 0; i < DEVICE_ID_LENGTH; i++) {
-        int index = rand() % (sizeof(charset) - 1);
-        device_id[i] = charset[index];
+    //Get the base MAC address from different sources
+    uint8_t base_mac_addr[6] = {0};
+    esp_err_t ret = ESP_OK;
+
+    //Get base MAC address from EFUSE BLK0(default option)
+    ret = esp_read_mac(base_mac_addr, ESP_MAC_EFUSE_FACTORY);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get base MAC address from EFUSE BLK0. (%s)", esp_err_to_name(ret));
+
+        // generate it with a random seed then
+        const char charset[] = "abcdefghijklmnopqrstuvwxyz0123456789";
+
+        // Seed the random number generator
+        srand(esp_random());
+
+        // Generate random ID
+        for (int i = 0; i < DEVICE_ID_LENGTH; i++) {
+            int index = rand() % (sizeof(charset) - 1);
+            device_id[i] = charset[index];
+        }
+        device_id[DEVICE_ID_LENGTH] = '\0';  // Null terminate the string
+        
+    } else {
+        ESP_LOGI(TAG, "Base MAC Address read from EFUSE BLK0: %s", base_mac_addr);
+        
+        //Set the base MAC address using the retrieved MAC address
+        ESP_LOGI(TAG, "Using \"0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x\" as base MAC address",
+            base_mac_addr[0], base_mac_addr[1], base_mac_addr[2], base_mac_addr[3], base_mac_addr[4], base_mac_addr[5]);
+        esp_iface_mac_addr_set(base_mac_addr, ESP_MAC_BASE);
+
+        // Use the last 3 bytes of MAC address to create a 6 character device_id
+        snprintf(device_id, 7, "%02X%02X%02X", base_mac_addr[3], base_mac_addr[4], base_mac_addr[5]);
+        ESP_LOGI(TAG, "Generated new device ID: %s", device_id);
     }
-    device_id[DEVICE_ID_LENGTH] = '\0';  // Null terminate the string
     
-    ESP_LOGI(TAG, "Generated new device ID: %s", device_id);
 }
 
 bool device_config_init(void) {
