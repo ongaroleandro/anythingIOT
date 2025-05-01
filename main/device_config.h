@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "mqtt.h"  // For light_state_t structure
+#include "lightstate.h"
 
 // Initialize device configuration
 // Returns true if initialization was successful
